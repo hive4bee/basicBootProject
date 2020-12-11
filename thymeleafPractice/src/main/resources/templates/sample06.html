@@ -1,0 +1,23 @@
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<title>sample06</title>
+</head>
+<body>
+	<table border="1" th:inline="text">
+		<tr>
+			<td>MID</td>
+			<td>MNAME</td>
+			<td>REGDATE</td>
+		</tr>
+		<tr th:each="member : ${list}">
+			<td>[[${member.mid}]]</td>
+			<td>[[${member.mname}]]</td>
+			<td>[[${member.regdate}]]</td>
+		</tr>
+	</table>
+	<script th:inline="javascript">
+		var result=[[${result}]];
+	</script>
+</body>
+</html>
