@@ -1,0 +1,232 @@
+<html xmlns:th="http://www.thymeleaf.org"
+	  xmlns:sec="http://www.thymeleaf.org/thymeleaf-extras-springsecurity5"
+	  xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+	  layout:decorate="~{/layout/default}">
+	<meta charset="utf-8">
+
+	<th:block layout:fragment="css">
+		<style th:inline="css">
+			
+		</style>
+	</th:block>
+	
+	<div layout:fragment="content">
+		<div class="panel-heading">View Page</div>
+		<div class="panel-body">
+			<div class="form-group">
+				<label>글번호</label> <input class="form-control" name="bno" th:value="${vo.bno}" readonly="readonly" />
+			</div>
+			
+			<div class="form-group">
+				<label>글제목</label> <input class="form-control" name="title" th:value="${vo.title}" readonly="readonly" />
+				<p class="help-block">Title text here.</p>
+			</div>
+			
+			<div class="form-group">
+				<label>글내용</label> <textarea class="form-control" rows="3" name="content" th:text="${vo.content}" readonly="readonly"></textarea>
+			</div>
+			
+			<div class="form-group">
+				<label>작성자</label> <input class="form-control" name="writer" th:value="${vo.writer}" readonly="readonly"/>
+			</div>
+			
+			<div class="form-group">
+				<label>작성일</label> <input class="form-control" name="regdate" th:value="${#dates.format(vo.regdate, 'yyyy-MM-dd HH:mm:dd')}" readonly="readonly"/>
+			</div>
+			
+			<div class="pull-right" th:with="uid=${#authentication.principal} eq 'anonymousUser' ? 'Guest' : ${#authentication.principal.username}">
+				<a th:if="${uid} eq ${vo.writer}" 
+				   th:href="@{modify(page=${pageVO.page},size=${pageVO.size},type=${pageVO.type},keyword=${pageVO.keyword},bno=${vo.bno})}" class="btn btn-default">수정/삭제</a>
+				<a th:href="@{list(page=${pageVO.page},size=${pageVO.size},type=${pageVO.type},keyword=${pageVO.keyword},bno=${vo.bno})}" class="btn btn-primary">리스트</a>
+			</div>
+			
+		</div>
+		<div class="container">
+			<table class="table table-striped table-bordered table-hover">
+				<thead>
+					<tr>
+						<th>댓글번호</th>
+						<th>댓글</th>
+						<th>작성자</th>
+						<th>작성일</th>
+					</tr>
+				</thead>
+				<tbody id="replyTable">
+				
+				</tbody>
+			</table>
+			<div class="pull-right">
+				<button class="btn" id="addReplyBtn">댓글 작성</button>
+			</div>
+		</div>
+		
+		<!-- Modal -->
+		<div id="myModal" class="modal fade" role="dialog">
+			<div class="modal-dialog">
+				<!-- Modal Content -->
+				<div class="modal-content">
+					<div class="modal-header">
+						<button type="button" class="close" data-dismiss="modal">&times;</button>
+						<h4 class="modal-title">Modal Header</h4>
+					</div>
+					<div class="modal-body">
+						<label>Reply Text</label>
+						<input type="text" class="form-control" name="replyText">
+						<label>Replyer</label>
+						<input type="text" class="form-control" name="replyer" readonly>
+					</div>
+					<div class="modal-footer">
+						<button id="delModalBtn" class="btn btn-danger">Delete</button>
+						<button id="modalBtn" class="btn btn-info">Save</button>
+						<button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+	
+	<th:block layout:fragment="script">
+		<script th:inline="javascript" th:src="@{'/js/reply.js'}"></script>
+		<script th:inline="javascript">
+			var bno = [[${vo.bno}]];
+			var mode;
+			var page=1;
+			var rno;
+			var uid = [[${#authentication.principal} eq 'anonymousUser' ? null : ${#authentication.principal.username}]];
+
+			var csrfHeaderName=[[${_csrf.headerName}]];
+			var csrfTokenValue=[[${_csrf.token}]];
+			var csrf=[[${_csrf}]];
+			console.log("csrfHeaderName:"+csrf.headerName+" / csrfTokenValue:"+csrf.token);
+			//console.log("csrfHeaderName: " + csrfHeaderName + " / csrfTokenValue: " + csrfTokenValue);
+			//console.log(replyManager);
+			$(document).ready(function(){
+				//load replies;
+				showList(1);
+				var replyTextObj = $("input[name='replyText']");
+				var replyerObj = $("input[name='replyer']");
+				
+				//bring modal 
+				$("#addReplyBtn").on("click", function(){
+					if(uid == null){
+						if(confirm("로그인할까요?")){
+							self.location=[[@{/login}]];
+						}
+						return;
+					}
+					
+					replyTextObj.val("");
+					replyerObj.val(uid);
+					$("#myModal").modal("show");
+					$(".modal-title").text("Add Reply");
+					mode="ADD";
+				});
+				
+				//in modal, click save button
+				$("#modalBtn").on("click", function(){
+					var replyText = replyTextObj.val();
+					var replyer = replyerObj.val();
+					if(mode == 'ADD'){
+						
+						var obj = {replyText:replyText, replyer:replyer,bno:bno,csrfHeaderName:csrfHeaderName,csrfTokenValue:csrfTokenValue};
+						replyManager.add(obj, function(result){
+							if(result == 'success'){
+								$("#myModal").modal("hide");
+								alert("댓글이 입력되었습니다.");
+								showList(page);
+								replyTextObj.val("");
+								replyerObj.val("");
+							}
+						});
+					}else if(mode='MOD'){
+						var obj={replyText:replyText, bno:bno, rno:rno,csrfHeaderName:csrfHeaderName,csrfTokenValue:csrfTokenValue};
+						replyManager.update(obj, function(result){
+							if(result=='success'){
+								$("#myModal").modal("hide");
+								alert("수정되었습니다.");
+								showList(page);
+								replyTextObj.val("");
+								replyerObj.val("");
+								mode='ADD';
+							}
+						});
+					}
+					
+				});
+				
+				//click tr area to modify or delete
+				$("#replyTable").on("click", "tr", function(e){
+					var tds = $(this).find("td");
+					rno = tds[0].innerHTML;
+					mod="MOD";
+					replyTextObj.val(tds[1].innerHTML);
+					replyerObj.val(tds[2].innerHTML);
+					
+					$("#myModal").modal("show");
+					$(".modal-title").text("수정/삭제");
+					
+					if(uid != tds[2].innerHTML.trim()){
+						$("#delModalBtn").hide();
+						$("#modalBtn").hide();
+					}else{
+						$("#delModalBtn").show();
+						$("#modalBtn").show();
+					}
+				});
+				
+				$("#delModalBtn").on("click", function(){
+					var obj={bno:bno, rno:rno,csrfHeaderName:csrfHeaderName,csrfTokenValue:csrfTokenValue}
+					replyManager.remove(obj, function(result){
+						if(result=='success'){
+							$("#myModal").modal("hide");
+							alert("댓글이 삭제되었습니다.");
+							replyTextObj.val("");
+							replyerObj.val("");
+							showList(page);
+						}
+					});
+				});
+				
+			});
+			function showList(page){
+				replyManager.getAll({bno:[[${vo.bno}]], page:1}, function(cnt,list){
+					//console.log("cnt: " + cnt)
+					//console.log("list: " + list);
+					var str="";
+					/* 
+					for(var i=0; i<list.length; i++){
+						str+="<tr>";
+						str+="<td>"+list[i].rno+"</td>";
+						str+="<td>"+list[i].replyText+"</td>";
+						str+="<td>"+list[i].replyer+"</td>";
+						str+="<td>"+list[i].regdate+"</td>";
+						str+="</tr>";
+					}
+					 */
+					$.each(list, function(index, item){
+						//console.log("index: "+index+" / item: "+item);
+						str+="<tr>";
+						str+="<td>"+item.rno+"</td>";
+						str+="<td>"+item.replyText+"</td>";
+						str+="<td>"+item.replyer+"</td>";
+						str+="<td>"+formatDate(item.regdate)+"</td>";
+						str+="</tr>";
+					});
+					$("#replyTable").html(str);
+					
+				});
+			}
+			function formatDate(timeValue){
+				var date = new Date(timeValue);
+				var year = date.getFullYear();
+				var month = date.getMonth()+1 >= 10 ? date.getMonth()+1 : '0'+(date.getMonth()+1);
+				var dates = date.getDate() >=10 ? date.getDate() : '0'+(date.getDate());
+				var hours = date.getHours();
+				var minutes = date.getMinutes() >= 10 ? date.getMinutes() : '0'+(date.getMinutes()+1);
+				var seconds = date.getSeconds() >= 10 ? date.getSeconds() : '0'+(date.getSeconds()); 
+				return year+"-"+month+"-"+dates+" "+hours+":"+minutes+":"+seconds;
+			}
+		</script>
+	</th:block>
+
+</html>
